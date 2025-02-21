@@ -1,0 +1,33 @@
+name: "Encrypt File"
+description: "Encrypt a file using openssl"
+inputs:
+  host:
+    description: "Hosting provider host"
+    required: true
+  username:
+    description: "Hosting provider username"
+    required: true
+  key:
+    description: "Hosting provider private key"
+    required: true
+  port:
+    description: "Hosting provider port"
+    required: true
+  file:
+    description: "File to encrypt"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Encrypt File
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.host }}
+        username: ${{ inputs.username }}
+        key: ${{ inputs.key }}
+        port: ${{ inputs.port }}
+        script: |
+          openssl enc -aes-256-cbc -iter 100000 -pbkdf2 -salt \
+          -in ${{ inputs.file }} \
+          -out ${{ inputs.file }}.enc \
+          -pass pass:$ENCRYPTION_PASSWORD

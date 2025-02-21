@@ -1,0 +1,230 @@
+name: WordPress Environment Backup Sync
+description: Synchronize WordPress environments with backup and database migration support
+
+env:
+  SOURCE_PATH: ${{ inputs.base_path }}/${{ inputs.source_env }}
+  TARGET_PATH: ${{ inputs.base_path }}${{ inputs.target_env == 'production' && '' || '/staging' }}
+  SOURCE_DOMAIN: ${{ inputs.source_env }}.${{ inputs.domain }}
+  TARGET_DOMAIN: ${{ inputs.target_env == 'production' && '' || 'staging.' }}${{ inputs.domain }}
+
+inputs:
+  source_env:
+    description: 'Source environment name (e.g., release, staging, development)'
+    required: true
+    type: string
+  target_env:
+    description: 'Target environment name (e.g., staging, production)'
+    required: true
+    type: string
+  base_path:
+    description: 'Base path for WordPress installations'
+    required: true
+    type: string
+  domain:
+    description: 'Base domain for the WordPress sites'
+    required: true
+    type: string
+  ssh_host:
+    description: 'SSH host'
+    required: true
+    type: string
+  ssh_username:
+    description: 'SSH username'
+    required: true
+    type: string
+  ssh_private_key:
+    description: 'SSH private key'
+    required: true
+    type: string
+  ssh_known_hosts:
+    description: 'SSH known hosts'
+    required: true
+    type: string
+  ssh_key_type:
+    description: 'SSH key type (e.g., id_rsa)'
+    required: true
+    type: string
+  ssh_port:
+    description: 'SSH port'
+    required: true
+    type: string
+    default: '22'
+  encryption_password:
+    description: 'Password for encrypting backup files'
+    required: true
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ inputs.ssh_private_key }}
+        known_hosts: ${{ inputs.ssh_known_hosts }}
+        name: ${{ inputs.ssh_key_type }}
+
+    - name: Enable Maintenance Mode
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          wp maintenance-mode activate --path=${{ env.TARGET_PATH }}
+
+    # WP-Content
+    - name: Sync Content
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/themes/ ${{ env.TARGET_PATH }}/wp-content/themes/
+          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/plugins/ ${{ env.TARGET_PATH }}/wp-content/plugins/
+          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/uploads/ ${{ env.TARGET_PATH }}/wp-content/uploads/
+          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/languages/ ${{ env.TARGET_PATH }}/wp-content/languages/
+          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/mu-plugins/ ${{ env.TARGET_PATH }}/wp-content/mu-plugins/
+
+    # Database Content
+    - name: Export Target Backup
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          wp db export ${{ env.TARGET_PATH }}/backup.sql --path=${{ env.TARGET_PATH }}
+
+    - name: Content Segmentation
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          wp search-replace "${{ env.SOURCE_DOMAIN }}" "${{ env.TARGET_DOMAIN }}" \
+          --export=${{ env.TARGET_PATH }}/migration.sql \
+          --path=${{ env.SOURCE_PATH }} \
+          --skip-columns=guid \
+          --skip-tables=wp_comments,wp_commentmeta,wp_lightspeed_url,wp_lightspeed_url_file,wp_user_registration_sessions
+          
+    - name: Import Source Migration to Target
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          wp db import ${{ env.TARGET_PATH }}/migration.sql --path=${{ env.TARGET_PATH }}
+
+    - name: Disable Maintenance Mode
+      if: always()  # Ensures this runs even after rollback
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          wp maintenance-mode deactivate --path=${{ env.TARGET_PATH }}
+
+    # Clear cache in target environment
+    - name: Clear Cache in Target
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        script: |
+          # Clear WordPress object cache
+          wp cache flush --path=${{ env.TARGET_PATH }}
+          # Clear WordPress transients
+          wp transient delete --all --path=${{ env.TARGET_PATH }}
+          # Clear rewrite rules and regenerate
+          wp rewrite flush --hard --path=${{ env.TARGET_PATH }}
+
+    # Artifact handling steps
+    ## Backup
+    - name: Compress Target Backup
+      uses: ./actions/compress
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        path: ${{ env.TARGET_PATH }}
+        file: backup.sql
+
+    - name: Encrypt Target Backup
+      uses: ./actions/encrypt
+      env:
+        ENCRYPTION_PASSWORD: ${{ inputs.encryption_password }}
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        file: ${{ env.TARGET_PATH }}/backup.sql.gz
+        
+    - name: Transfer Target Backup to GitHub Runner
+      uses: ./actions/scp
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key_type: ${{ inputs.ssh_key_type }}
+        port: ${{ inputs.ssh_port }}
+        remote_path: ${{ env.TARGET_PATH }}
+        source_path: ./backup/${{ inputs.target_env }}
+        file: backup.sql.gz.enc
+
+    ## Migration
+    - name: Compress Source Migration
+      uses: ./actions/compress
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        path: ${{ env.TARGET_PATH }}
+        file: migration.sql
+
+    - name: Encrypt Source Migration
+      uses: ./actions/encrypt
+      env:
+        ENCRYPTION_PASSWORD: ${{ inputs.encryption_password }}
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key: ${{ inputs.ssh_private_key }}
+        port: ${{ inputs.ssh_port }}
+        file: ${{ env.TARGET_PATH }}/migration.sql.gz
+
+    - name: Transfer Source Migration to GitHub Runner
+      uses: ./actions/scp
+      with:
+        host: ${{ inputs.ssh_host }}
+        username: ${{ inputs.ssh_username }}
+        key_type: ${{ inputs.ssh_key_type }}
+        port: ${{ inputs.ssh_port }}
+        remote_path: ${{ env.TARGET_PATH }}
+        source_path: ./migration/${{ inputs.target_env }}
+        file: migration.sql.gz.enc
+
+    - name: Configure Git and Push Changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add .
+        git commit -m "backup ${{ inputs.target_env }} and sync with ${{ inputs.source_env }}"
+        git push origin HEAD:${{ github.ref }}
