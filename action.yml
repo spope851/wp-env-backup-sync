@@ -163,7 +163,7 @@ runs:
     # Artifact handling steps
     ## Backup
     - name: Compress Target Backup
-      uses: ./actions/compress
+      uses: ${{ github.action_path }}/actions/compress
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
@@ -173,7 +173,7 @@ runs:
         file: backup.sql
 
     - name: Encrypt Target Backup
-      uses: ./actions/encrypt
+      uses: ${{ github.action_path }}/actions/encrypt
       env:
         ENCRYPTION_PASSWORD: ${{ inputs.encryption_password }}
       with:
@@ -184,7 +184,7 @@ runs:
         file: ${{ env.TARGET_PATH }}/backup.sql.gz
         
     - name: Transfer Target Backup to GitHub Runner
-      uses: ./actions/scp
+      uses: ${{ github.action_path }}/actions/scp
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
@@ -196,7 +196,7 @@ runs:
 
     ## Migration
     - name: Compress Source Migration
-      uses: ./actions/compress
+      uses: ${{ github.action_path }}/actions/compress
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
@@ -206,7 +206,7 @@ runs:
         file: migration.sql
 
     - name: Encrypt Source Migration
-      uses: ./actions/encrypt
+      uses: ${{ github.action_path }}/actions/encrypt
       env:
         ENCRYPTION_PASSWORD: ${{ inputs.encryption_password }}
       with:
@@ -217,7 +217,7 @@ runs:
         file: ${{ env.TARGET_PATH }}/migration.sql.gz
 
     - name: Transfer Source Migration to GitHub Runner
-      uses: ./actions/scp
+      uses: ${{ github.action_path }}/actions/scp
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
