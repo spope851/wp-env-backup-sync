@@ -163,69 +163,69 @@ runs:
     # Artifact handling steps
     ## Backup
     - name: Compress Target Backup
-      uses: ${{ github.action_path }}/actions/compress
+      uses: appleboy/ssh-action@v0.1.8
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
-        path: ${{ env.TARGET_PATH }}
-        file: backup.sql
+        script: |
+          cd ${{ env.TARGET_PATH }}
+          gzip -f backup.sql
 
     - name: Encrypt Target Backup
-      uses: ${{ github.action_path }}/actions/encrypt
-      env:
-        ENCRYPTION_PASSWORD: ${{ inputs.encryption_password }}
+      uses: appleboy/ssh-action@v0.1.8
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
-        file: ${{ env.TARGET_PATH }}/backup.sql.gz
+        script: |
+          openssl enc -aes-256-cbc -iter 100000 -pbkdf2 -salt \
+          -in ${{ env.TARGET_PATH }}/backup.sql.gz \
+          -out ${{ env.TARGET_PATH }}/backup.sql.gz.enc \
+          -pass pass:${{ inputs.encryption_password }}
         
     - name: Transfer Target Backup to GitHub Runner
-      uses: ${{ github.action_path }}/actions/scp
-      with:
-        host: ${{ inputs.ssh_host }}
-        username: ${{ inputs.ssh_username }}
-        key_type: ${{ inputs.ssh_key_type }}
-        port: ${{ inputs.ssh_port }}
-        remote_path: ${{ env.TARGET_PATH }}
-        source_path: ./backup/${{ inputs.target_env }}
-        file: backup.sql.gz.enc
+      shell: bash
+      run: |
+        eval `ssh-agent -s`
+        ssh-add ~/.ssh/${{ inputs.key_type }}
+        ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
+        scp -P ${{ inputs.ssh_port }} ${{ inputs.ssh_username }}@${{ inputs.ssh_host }}:${{ env.TARGET_PATH }}/backup.sql.gz.enc ././backup/${{ inputs.target_env }}/$(date +%Y-%m-%d-%H-%M-%S).sql.gz.enc
 
     ## Migration
     - name: Compress Source Migration
-      uses: ${{ github.action_path }}/actions/compress
+      uses: appleboy/ssh-action@v0.1.8
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
-        path: ${{ env.TARGET_PATH }}
-        file: migration.sql
+        script: |
+          cd ${{ env.TARGET_PATH }}
+          gzip -f migration.sql
 
     - name: Encrypt Source Migration
-      uses: ${{ github.action_path }}/actions/encrypt
-      env:
-        ENCRYPTION_PASSWORD: ${{ inputs.encryption_password }}
+      uses: appleboy/ssh-action@v0.1.8
       with:
         host: ${{ inputs.ssh_host }}
         username: ${{ inputs.ssh_username }}
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
-        file: ${{ env.TARGET_PATH }}/migration.sql.gz
+        script: |
+          openssl enc -aes-256-cbc -iter 100000 -pbkdf2 -salt \
+          -in ${{ env.TARGET_PATH }}/migration.sql.gz \
+          -out ${{ env.TARGET_PATH }}/migration.sql.gz.enc \
+          -pass pass:${{ inputs.encryption_password }}
 
     - name: Transfer Source Migration to GitHub Runner
-      uses: ${{ github.action_path }}/actions/scp
-      with:
-        host: ${{ inputs.ssh_host }}
-        username: ${{ inputs.ssh_username }}
-        key_type: ${{ inputs.ssh_key_type }}
-        port: ${{ inputs.ssh_port }}
-        remote_path: ${{ env.TARGET_PATH }}
-        source_path: ./migration/${{ inputs.target_env }}
-        file: migration.sql.gz.enc
+      shell: bash
+      run: |
+        eval `ssh-agent -s`
+        ssh-add ~/.ssh/${{ inputs.key_type }}
+        ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
+        scp -P ${{ inputs.ssh_port }} ${{ inputs.ssh_username }}@${{ inputs.ssh_host }}:${{ env.TARGET_PATH }}/migration.sql.gz.enc ././migration/${{ inputs.target_env }}/$(date +%Y-%m-%d-%H-%M-%S).sql.gz.enc
 
     - name: Configure Git and Push Changes
       env:
