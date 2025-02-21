@@ -46,6 +46,7 @@ jobs:
           ssh_key_type: 'id_rsa'
           ssh_port: '22'
           encryption_password: '${{ secrets.ENCRYPTION_PASSWORD }}'
+          github_token: '${{ secrets.GITHUB_TOKEN }}'
 ```
 
 ### Inputs
@@ -61,7 +62,7 @@ jobs:
 - `ssh_key_type` (required): SSH key type (e.g., id_rsa)
 - `ssh_port` (required, default: '22'): SSH port
 - `encryption_password` (required): Password for encrypting backup files
-
+- `github_token` (required): GitHub token for pushing changes
 ### What it does
 
 1. Activates maintenance mode on the target environment

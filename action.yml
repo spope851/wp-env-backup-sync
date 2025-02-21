@@ -1,5 +1,8 @@
 name: WordPress Environment Backup Sync
 description: Synchronize WordPress environments with backup and database migration support
+branding:
+  icon: 'refresh-cw'  
+  color: 'white'      
 
 inputs:
   source_env:
@@ -45,6 +48,10 @@ inputs:
     default: '22'
   encryption_password:
     description: 'Password for encrypting backup files'
+    required: true
+    type: string
+  github_token:
+    description: 'GitHub token for pushing changes'
     required: true
     type: string
 
@@ -222,7 +229,7 @@ runs:
 
     - name: Configure Git and Push Changes
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
       shell: bash
       run: |
         git config --global user.name "github-actions[bot]"
