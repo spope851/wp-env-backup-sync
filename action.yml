@@ -192,7 +192,7 @@ runs:
       shell: bash
       run: |
         eval `ssh-agent -s`
-        ssh-add ~/.ssh/${{ inputs.key_type }}
+        ssh-add ~/.ssh/${{ inputs.ssh_key_type }}
         ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
         scp -P ${{ inputs.ssh_port }} ${{ inputs.ssh_username }}@${{ inputs.ssh_host }}:${{ env.TARGET_PATH }}/backup.sql.gz.enc ./backup/${{ inputs.target_env }}/$(date +%Y-%m-%d-%H-%M-%S).sql.gz.enc
 
@@ -228,7 +228,7 @@ runs:
       shell: bash
       run: |
         eval `ssh-agent -s`
-        ssh-add ~/.ssh/${{ inputs.key_type }}
+        ssh-add ~/.ssh/${{ inputs.ssh_key_type }}
         ssh-keyscan -p ${{ inputs.ssh_port }} -H ${{ inputs.ssh_host }} >> ~/.ssh/known_hosts
         scp -P ${{ inputs.ssh_port }} ${{ inputs.ssh_username }}@${{ inputs.ssh_host }}:${{ env.TARGET_PATH }}/migration.sql.gz.enc ./migration/${{ inputs.target_env }}/$(date +%Y-%m-%d-%H-%M-%S).sql.gz.enc
 
