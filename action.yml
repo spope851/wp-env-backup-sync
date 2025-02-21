@@ -1,12 +1,6 @@
 name: WordPress Environment Backup Sync
 description: Synchronize WordPress environments with backup and database migration support
 
-env:
-  SOURCE_PATH: ${{ inputs.base_path }}/${{ inputs.source_env }}
-  TARGET_PATH: ${{ inputs.base_path }}${{ inputs.target_env == 'production' && '' || '/staging' }}
-  SOURCE_DOMAIN: ${{ inputs.source_env }}.${{ inputs.domain }}
-  TARGET_DOMAIN: ${{ inputs.target_env == 'production' && '' || 'staging.' }}${{ inputs.domain }}
-
 inputs:
   source_env:
     description: 'Source environment name (e.g., release, staging, development)'
@@ -63,6 +57,14 @@ runs:
         key: ${{ inputs.ssh_private_key }}
         known_hosts: ${{ inputs.ssh_known_hosts }}
         name: ${{ inputs.ssh_key_type }}
+
+    - name: Set environment variables
+      shell: bash
+      run: |
+        echo "SOURCE_PATH=${{ inputs.base_path }}/${{ inputs.source_env }}" >> $GITHUB_ENV
+        echo "TARGET_PATH=${{ inputs.base_path }}${{ inputs.target_env == 'production' && '' || '/staging' }}" >> $GITHUB_ENV
+        echo "SOURCE_DOMAIN=${{ inputs.source_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
+        echo "TARGET_DOMAIN=${{ inputs.target_env == 'production' && '' || 'staging.' }}${{ inputs.domain }}" >> $GITHUB_ENV
 
     - name: Enable Maintenance Mode
       uses: appleboy/ssh-action@v0.1.8
