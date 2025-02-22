@@ -187,11 +187,11 @@ runs:
         port: ${{ inputs.ssh_port }}
         script: |
           cd ${{ env.TARGET_PATH }}
-          PASS="${{ inputs.encryption_password }}"
+          PASS='${{ inputs.encryption_password }}'
           openssl enc -aes-256-cbc -iter 100000 -pbkdf2 -salt \
             -in backup.sql.gz \
             -out backup.sql.gz.enc \
-            -pass "pass:$PASS"
+            -pass "pass:${PASS}"
         
     - name: Transfer Target Backup to GitHub Runner
       shell: bash
@@ -222,11 +222,11 @@ runs:
         port: ${{ inputs.ssh_port }}
         script: |
           cd ${{ env.TARGET_PATH }}
-          PASS="${{ inputs.encryption_password }}"
+          PASS='${{ inputs.encryption_password }}'
           openssl enc -aes-256-cbc -iter 100000 -pbkdf2 -salt \
             -in migration.sql.gz \
             -out migration.sql.gz.enc \
-            -pass "pass:$PASS"
+            -pass "pass:${PASS}"
 
 
     - name: Transfer Source Migration to GitHub Runner
