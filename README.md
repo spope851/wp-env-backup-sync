@@ -95,6 +95,24 @@ jobs:
   - `public_html/release/` (release)
 - Environment domains follow same naming convention as the environment directories, e.g. `example.com`, `staging.example.com`, `development.example.com`, `release.example.com`
 
+### Release Versioning
+
+This action uses semantic versioning. The version is set in the `action.yml` file and is incremented with each release. The following tags are maintained:
+
+- `vX` - Latest release
+- `vX.Y.Z` - Specific release
+
+To create a new release, use the following commands:
+
+``` bash
+changie batch patch|minor|major
+changie merge
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+git tag -fa vX -m "Update vX tag"
+git push origin vX --force
+```
+
 ### Contributing
 
 If you have any suggestions or improvements, please create an issue or submit a pull request.
