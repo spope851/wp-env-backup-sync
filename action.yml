@@ -112,7 +112,9 @@ runs:
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
         script: |
-          wp db export ${{ env.TARGET_PATH }}/backup.sql --path=${{ env.TARGET_PATH }}
+          wp db export ${{ env.TARGET_PATH }}/backup.sql \
+          --all-tables \
+          --path=${{ env.TARGET_PATH }}
 
     - name: Content Segmentation
       uses: appleboy/ssh-action@v0.1.8
@@ -123,6 +125,7 @@ runs:
         port: ${{ inputs.ssh_port }}
         script: |
           wp search-replace "${{ env.SOURCE_DOMAIN }}" "${{ env.TARGET_DOMAIN }}" \
+          --all-tables \
           --export=${{ env.TARGET_PATH }}/migration.sql \
           --path=${{ env.SOURCE_PATH }} \
           --skip-columns=guid \
@@ -227,7 +230,6 @@ runs:
             -in migration.sql.gz \
             -out migration.sql.gz.enc \
             -pass "pass:${PASS}"
-
 
     - name: Transfer Source Migration to GitHub Runner
       shell: bash
