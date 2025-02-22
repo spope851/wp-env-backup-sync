@@ -68,10 +68,15 @@ runs:
     - name: Set environment variables
       shell: bash
       run: |
+        if [ "${{ inputs.target_env }}" = "production" ]; then
+          echo "TARGET_PATH=${{ inputs.base_path }}" >> $GITHUB_ENV
+          echo "TARGET_DOMAIN=${{ inputs.domain }}" >> $GITHUB_ENV
+        else
+          echo "TARGET_PATH=${{ inputs.base_path }}/${{ inputs.target_env }}" >> $GITHUB_ENV
+          echo "TARGET_DOMAIN=${{ inputs.target_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
+        fi
         echo "SOURCE_PATH=${{ inputs.base_path }}/${{ inputs.source_env }}" >> $GITHUB_ENV
-        echo "TARGET_PATH=${{ inputs.base_path }}/${{ (inputs.target_env == 'production') && '' || inputs.target_env }}" >> $GITHUB_ENV
         echo "SOURCE_DOMAIN=${{ inputs.source_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
-        echo "TARGET_DOMAIN=${{ (inputs.target_env == 'production') && inputs.domain || format('{0}.{1}', inputs.target_env, inputs.domain) }}" >> $GITHUB_ENV
 
     - name: Enable Maintenance Mode
       uses: appleboy/ssh-action@v0.1.8
