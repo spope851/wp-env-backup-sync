@@ -54,6 +54,31 @@ inputs:
     description: 'GitHub token for pushing changes'
     required: true
     type: string
+  skip_tables:
+    description: 'Comma-separated list of tables to skip during search-replace. Use empty string to skip no tables.'
+    required: false
+    type: string
+    default: 'wp_comments,wp_commentmeta'
+  clear_cache_commands:
+    description: 'Comma-separated list of cache clear commands to run (flush,transients,rewrite). Use empty string to skip cache clearing.'
+    required: false
+    type: string
+    default: 'flush,transients,rewrite'
+  sync_content_dirs:
+    description: 'Comma-separated list of wp-content directories to sync (themes,plugins,uploads,languages,mu-plugins). Use empty string to skip content sync.'
+    required: false
+    type: string
+    default: 'themes,plugins,uploads,mu-plugins'
+  encryption_algorithm:
+    description: 'OpenSSL encryption algorithm to use for backups'
+    required: false
+    type: string
+    default: 'aes-256-cbc'
+  encryption_iterations:
+    description: 'Number of PBKDF2 iterations for backup encryption'
+    required: false
+    type: string
+    default: '100000'
 
 runs:
   using: "composite"
@@ -90,6 +115,7 @@ runs:
 
     # WP-Content
     - name: Sync Content
+      if: inputs.sync_content_dirs != ''
       uses: appleboy/ssh-action@v0.1.8
       with:
         host: ${{ inputs.ssh_host }}
@@ -97,11 +123,9 @@ runs:
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
         script: |
-          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/themes/ ${{ env.TARGET_PATH }}/wp-content/themes/
-          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/plugins/ ${{ env.TARGET_PATH }}/wp-content/plugins/
-          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/uploads/ ${{ env.TARGET_PATH }}/wp-content/uploads/
-          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/languages/ ${{ env.TARGET_PATH }}/wp-content/languages/
-          rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/mu-plugins/ ${{ env.TARGET_PATH }}/wp-content/mu-plugins/
+          for dir in $(echo "${{ inputs.sync_content_dirs }}" | tr ',' ' '); do
+            rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/$dir/ ${{ env.TARGET_PATH }}/wp-content/$dir/
+          done
 
     # Database Content
     - name: Export Target Backup
@@ -129,7 +153,7 @@ runs:
           --export=${{ env.TARGET_PATH }}/migration.sql \
           --path=${{ env.SOURCE_PATH }} \
           --skip-columns=guid \
-          --skip-tables=wp_comments,wp_commentmeta,wp_lightspeed_url,wp_lightspeed_url_file,wp_user_registration_sessions
+          --skip-tables=${{ inputs.skip_tables }}
           
     - name: Import Source Migration to Target
       uses: appleboy/ssh-action@v0.1.8
@@ -154,6 +178,7 @@ runs:
 
     # Clear cache in target environment
     - name: Clear Cache in Target
+      if: inputs.clear_cache_commands != ''
       uses: appleboy/ssh-action@v0.1.8
       with:
         host: ${{ inputs.ssh_host }}
@@ -161,12 +186,19 @@ runs:
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
         script: |
-          # Clear WordPress object cache
-          wp cache flush --path=${{ env.TARGET_PATH }}
-          # Clear WordPress transients
-          wp transient delete --all --path=${{ env.TARGET_PATH }}
-          # Clear rewrite rules and regenerate
-          wp rewrite flush --hard --path=${{ env.TARGET_PATH }}
+          for cmd in $(echo "${{ inputs.clear_cache_commands }}" | tr ',' ' '); do
+            case $cmd in
+              "flush")
+                wp cache flush --path=${{ env.TARGET_PATH }}
+                ;;
+              "transients")
+                wp transient delete --all --path=${{ env.TARGET_PATH }}
+                ;;
+              "rewrite")
+                wp rewrite flush --hard --path=${{ env.TARGET_PATH }}
+                ;;
+            esac
+          done
 
     # Artifact handling steps
     ## Backup
@@ -191,7 +223,7 @@ runs:
         script: |
           cd ${{ env.TARGET_PATH }}
           PASS='${{ inputs.encryption_password }}'
-          openssl enc -aes-256-cbc -iter 100000 -pbkdf2 -salt \
+          openssl enc -${{ inputs.encryption_algorithm }} -iter ${{ inputs.encryption_iterations }} -pbkdf2 -salt \
             -in backup.sql.gz \
             -out backup.sql.gz.enc \
             -pass "pass:${PASS}"

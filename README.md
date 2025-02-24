@@ -47,10 +47,17 @@ jobs:
           ssh_port: '22'
           encryption_password: '${{ secrets.ENCRYPTION_PASSWORD }}'
           github_token: '${{ secrets.GITHUB_TOKEN }}'
+          # Optional inputs with defaults
+          skip_tables: 'wp_comments,wp_commentmeta'  # Use '' to skip no tables
+          clear_cache_commands: 'flush,transients,rewrite'  # Use '' to skip cache clearing
+          sync_content_dirs: 'themes,plugins,uploads,mu-plugins'  # Use '' to skip content sync
+          encryption_algorithm: 'aes-256-cbc'
+          encryption_iterations: '100000'
 ```
 
 ### Inputs
 
+#### Required Inputs
 - `source_env` (required): Source environment name (e.g., release, staging, development)
 - `target_env` (required): Target environment name (e.g., staging, production)
 - `base_path` (required): Base path for WordPress installations
@@ -63,6 +70,14 @@ jobs:
 - `ssh_port` (required, default: '22'): SSH port
 - `encryption_password` (required): Password for encrypting backup files
 - `github_token` (required): GitHub token for pushing changes
+
+#### Optional Inputs
+- `skip_tables` (default: 'wp_comments,wp_commentmeta'): Comma-separated list of tables to skip during search-replace. Use empty string to skip no tables.
+- `clear_cache_commands` (default: 'flush,transients,rewrite'): Comma-separated list of cache clear commands to run. Use empty string to skip cache clearing.
+- `sync_content_dirs` (default: 'themes,plugins,uploads,mu-plugins'): Comma-separated list of wp-content directories to sync. Use empty string to skip content sync.
+- `encryption_algorithm` (default: 'aes-256-cbc'): OpenSSL encryption algorithm to use for backups
+- `encryption_iterations` (default: '100000'): Number of PBKDF2 iterations for backup encryption
+
 ### What it does
 
 1. Activates maintenance mode on the target environment
