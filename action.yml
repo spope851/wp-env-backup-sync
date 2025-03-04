@@ -60,7 +60,7 @@ inputs:
     type: string
     default: 'wp_comments,wp_commentmeta'
   clear_cache_commands:
-    description: 'Comma-separated list of cache clear commands to run (flush,transients,rewrite). Use empty string to skip cache clearing.'
+    description: 'Comma-separated list of cache clear commands to run (flush,transients,rewrite,litespeed). Use empty string to skip cache clearing.'
     required: false
     type: string
     default: 'flush,transients,rewrite'
@@ -196,6 +196,12 @@ runs:
                 ;;
               "rewrite")
                 wp rewrite flush --hard --path=${{ env.TARGET_PATH }}
+                ;;
+              "litespeed")
+                # Check if LiteSpeed Cache plugin is active before attempting to purge
+                if wp plugin is-active litespeed-cache --path=${{ env.TARGET_PATH }}; then
+                  wp litespeed-purge all --path=${{ env.TARGET_PATH }}
+                fi
                 ;;
             esac
           done
