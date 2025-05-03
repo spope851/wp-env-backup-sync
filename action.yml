@@ -65,7 +65,7 @@ inputs:
     type: string
     default: 'flush,transients,rewrite'
   sync_content_dirs:
-    description: 'Comma-separated list of wp-content directories to sync (themes,plugins,uploads,languages,mu-plugins). Use empty string to skip content sync.'
+    description: 'Comma-separated list of wp-content directories or files to sync (e.g., themes,plugins,uploads,languages,mu-plugins,custom-file.php). Use empty string to skip content sync.'
     required: false
     type: string
     default: 'themes,plugins,uploads,mu-plugins'
@@ -123,8 +123,22 @@ runs:
         key: ${{ inputs.ssh_private_key }}
         port: ${{ inputs.ssh_port }}
         script: |
-          for dir in $(echo "${{ inputs.sync_content_dirs }}" | tr ',' ' '); do
-            rsync -avz --delete ${{ env.SOURCE_PATH }}/wp-content/$dir/ ${{ env.TARGET_PATH }}/wp-content/$dir/
+          for item in $(echo "${{ inputs.sync_content_dirs }}" | tr ',' ' '); do
+            SOURCE_ITEM="${{ env.SOURCE_PATH }}/wp-content/$item"
+            
+            # Check if item doesn't exist
+            if [ ! -e "$SOURCE_ITEM" ]; then
+              echo "Warning: $item not found in source wp-content directory"
+              continue
+            fi
+            
+            # Handle file
+            if [ -f "$SOURCE_ITEM" ]; then
+              rsync -avz "$SOURCE_ITEM" "${{ env.TARGET_PATH }}/wp-content/$item"
+            # Handle directory
+            elif [ -d "$SOURCE_ITEM" ]; then
+              rsync -avz --delete "$SOURCE_ITEM/" "${{ env.TARGET_PATH }}/wp-content/$item/"
+            fi
           done
 
     # Database Content
