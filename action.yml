@@ -134,7 +134,7 @@ runs:
             
             # Handle file
             if [ -f "$SOURCE_ITEM" ]; then
-              rsync -avz "$SOURCE_ITEM" "${{ env.TARGET_PATH }}/wp-content/$item"
+              cp -f "$SOURCE_ITEM" "${{ env.TARGET_PATH }}/wp-content/$item"
             # Handle directory
             elif [ -d "$SOURCE_ITEM" ]; then
               rsync -avz --delete "$SOURCE_ITEM/" "${{ env.TARGET_PATH }}/wp-content/$item/"
