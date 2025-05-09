@@ -6,20 +6,20 @@ branding:
 
 inputs:
   source_env:
-    description: 'Source environment name (e.g., release, staging, development)'
-    required: true
+    description: 'Source environment name (e.g., release, staging, development). Required if source_path and source_domain are not provided.'
+    required: false
     type: string
   target_env:
-    description: 'Target environment name (e.g., staging, production)'
-    required: true
+    description: 'Target environment name (e.g., staging, production). Required if target_path and target_domain are not provided.'
+    required: false
     type: string
   base_path:
-    description: 'Base path for WordPress installations'
-    required: true
+    description: 'Base path for WordPress installations. Required if source_path and target_path are not provided.'
+    required: false
     type: string
   domain:
-    description: 'Base domain for the WordPress sites'
-    required: true
+    description: 'Base domain for the WordPress sites. Required if source_domain and target_domain are not provided.'
+    required: false
     type: string
   ssh_host:
     description: 'SSH host'
@@ -79,6 +79,22 @@ inputs:
     required: false
     type: string
     default: '100000'
+  target_path:
+    description: 'Direct target path override. If not provided, will be constructed from base_path and target_env.'
+    required: false
+    type: string
+  target_domain:
+    description: 'Direct target domain override. If not provided, will be constructed from target_env and domain.'
+    required: false
+    type: string
+  source_path:
+    description: 'Direct source path override. If not provided, will be constructed from base_path and source_env.'
+    required: false
+    type: string
+  source_domain:
+    description: 'Direct source domain override. If not provided, will be constructed from source_env and domain.'
+    required: false
+    type: string
 
 runs:
   using: "composite"
@@ -93,15 +109,57 @@ runs:
     - name: Set environment variables
       shell: bash
       run: |
-        if [ "${{ inputs.target_env }}" = "production" ]; then
-          echo "TARGET_PATH=${{ inputs.base_path }}" >> $GITHUB_ENV
-          echo "TARGET_DOMAIN=${{ inputs.domain }}" >> $GITHUB_ENV
-        else
-          echo "TARGET_PATH=${{ inputs.base_path }}/${{ inputs.target_env }}" >> $GITHUB_ENV
-          echo "TARGET_DOMAIN=${{ inputs.target_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
+        # Validate required inputs
+        if [ -z "${{ inputs.source_path }}" ] && [ -z "${{ inputs.source_env }}" ]; then
+          echo "Error: Either source_path or source_env must be provided"
+          exit 1
         fi
-        echo "SOURCE_PATH=${{ inputs.base_path }}/${{ inputs.source_env }}" >> $GITHUB_ENV
-        echo "SOURCE_DOMAIN=${{ inputs.source_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
+        if [ -z "${{ inputs.target_path }}" ] && [ -z "${{ inputs.target_env }}" ]; then
+          echo "Error: Either target_path or target_env must be provided"
+          exit 1
+        fi
+        if [ -z "${{ inputs.source_path }}" ] && [ -z "${{ inputs.target_path }}" ] && [ -z "${{ inputs.base_path }}" ]; then
+          echo "Error: base_path is required when using environment-based paths"
+          exit 1
+        fi
+        if [ -z "${{ inputs.source_domain }}" ] && [ -z "${{ inputs.target_domain }}" ] && [ -z "${{ inputs.domain }}" ]; then
+          echo "Error: domain is required when using environment-based domains"
+          exit 1
+        fi
+
+        # Set target path and domain
+        if [ -n "${{ inputs.target_path }}" ]; then
+          echo "TARGET_PATH=${{ inputs.target_path }}" >> $GITHUB_ENV
+        else
+          if [ "${{ inputs.target_env }}" = "production" ]; then
+            echo "TARGET_PATH=${{ inputs.base_path }}" >> $GITHUB_ENV
+          else
+            echo "TARGET_PATH=${{ inputs.base_path }}/${{ inputs.target_env }}" >> $GITHUB_ENV
+          fi
+        fi
+
+        if [ -n "${{ inputs.target_domain }}" ]; then
+          echo "TARGET_DOMAIN=${{ inputs.target_domain }}" >> $GITHUB_ENV
+        else
+          if [ "${{ inputs.target_env }}" = "production" ]; then
+            echo "TARGET_DOMAIN=${{ inputs.domain }}" >> $GITHUB_ENV
+          else
+            echo "TARGET_DOMAIN=${{ inputs.target_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
+          fi
+        fi
+
+        # Set source path and domain
+        if [ -n "${{ inputs.source_path }}" ]; then
+          echo "SOURCE_PATH=${{ inputs.source_path }}" >> $GITHUB_ENV
+        else
+          echo "SOURCE_PATH=${{ inputs.base_path }}/${{ inputs.source_env }}" >> $GITHUB_ENV
+        fi
+
+        if [ -n "${{ inputs.source_domain }}" ]; then
+          echo "SOURCE_DOMAIN=${{ inputs.source_domain }}" >> $GITHUB_ENV
+        else
+          echo "SOURCE_DOMAIN=${{ inputs.source_env }}.${{ inputs.domain }}" >> $GITHUB_ENV
+        fi
 
     - name: Enable Maintenance Mode
       uses: appleboy/ssh-action@v0.1.8

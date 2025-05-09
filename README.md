@@ -35,10 +35,18 @@ jobs:
       - name: Sync WordPress environments
         uses: spope851/wp-env-backup-sync@v1
         with:
+          # Option 1: Environment-based paths (original way)
           source_env: ${{ github.event.inputs.source_env }}
           target_env: ${{ github.event.inputs.target_env }}
           base_path: '/home/u123456/domains/example.com/public_html'
           domain: 'example.com'
+          
+          # Option 2: Direct paths (new way)
+          source_path: '/home/u123456/domains/example.com/public_html/staging'
+          target_path: '/home/u123456/domains/example.com/public_html/production'
+          source_domain: 'staging.example.com'
+          target_domain: 'app.example.com'
+          
           ssh_host: '${{ secrets.SSH_HOST }}'
           ssh_username: '${{ secrets.SSH_USERNAME }}'
           ssh_private_key: '${{ secrets.SSH_PRIVATE_KEY }}'
@@ -70,6 +78,23 @@ jobs:
 - `ssh_port` (required, default: '22'): SSH port
 - `encryption_password` (required): Password for encrypting backup files
 - `github_token` (required): GitHub token for pushing changes
+
+#### Path Configuration Inputs
+You can specify paths and domains in two ways:
+
+1. Environment-based (original way):
+   - `source_env`: Source environment name (e.g., release, staging, development)
+   - `target_env`: Target environment name (e.g., staging, production)
+   - `base_path`: Base path for WordPress installations
+   - `domain`: Base domain for the WordPress sites
+
+2. Direct paths (new way):
+   - `source_path`: Direct source path override
+   - `target_path`: Direct target path override
+   - `source_domain`: Direct source domain override
+   - `target_domain`: Direct target domain override
+
+Note: You must provide either all environment-based inputs or all direct path inputs. You cannot mix and match between the two approaches.
 
 #### Optional Inputs
 - `skip_tables` (default: 'wp_comments,wp_commentmeta'): Comma-separated list of tables to skip during search-replace. Use empty string to skip no tables.
@@ -103,12 +128,14 @@ jobs:
 
 ### Assumptions
 
-- WordPress installation structure:
+- WordPress installation structure (when using environment-based paths):
   - `public_html/` (production)
   - `public_html/staging/` (staging)
   - `public_html/development/` (development)
   - `public_html/release/` (release)
-- Environment domains follow same naming convention as the environment directories, e.g. `example.com`, `staging.example.com`, `development.example.com`, `release.example.com`
+- Environment domains follow same naming convention as the environment directories, e.g. `example.com`, `staging.example.com`, `development.example.com`, `release.example.com` (when using environment-based paths)
+
+When using direct paths, you can use any path and domain structure you prefer.
 
 ### Release Versioning
 
